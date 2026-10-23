@@ -129,7 +129,12 @@ function authView(mode = "login") {
       options: { data: { full_name: name.value.trim(), level: level.value, age: age.value } }
     });
     if (error) { btn.disabled = false; return say(error.message); }
-    if (!data.session) { btn.disabled = false; return say("Account created. Confirm the email we sent you, then log in.", true); }
+    let session = data.session;
+    if (!session) {   // some projects still report "no session"; try signing in straight away
+      const r = await db.auth.signInWithPassword({ email: email.value.trim(), password: pw.value });
+      session = r.data?.session;
+    }
+    if (!session) { btn.disabled = false; return say("Account created. Confirm the email we sent you, then log in.", true); }
     const courses = [...picked];
     const { error: e2 } = await db.from("payments").insert({
       student_id: data.user.id, course_codes: courses,
