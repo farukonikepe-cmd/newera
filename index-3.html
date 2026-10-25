@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>New Era Tutors</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<style>
+:root{--navy:#0E1E3D;--gold:#C6A24C;--paper:#F7F4EC;--line:#DCD5C2;--ink:#1B1F27;--soft:#5B6270;--rust:#B25B3E;--sage:#5B8266}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.45}
+.top{background:var(--navy);color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center}
+.top b{font-size:17px}.top span{color:var(--gold)}
+main{max-width:560px;margin:0 auto;padding:18px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+h2{font-size:20px;margin:0 0 10px;color:var(--navy)}h3{font-size:15px;margin:0 0 8px;color:var(--navy)}
+label{display:block;font-size:13px;font-weight:600;color:var(--soft);margin-bottom:12px}
+input,select{width:100%;padding:11px 12px;margin-top:5px;border:1px solid var(--line);border-radius:9px;font-size:15px;background:#fff}
+label.row{display:flex;gap:10px;align-items:center;font-weight:500;color:var(--ink);margin-bottom:8px;padding:10px;border:1px solid var(--line);border-radius:9px}
+label.row input{width:auto;margin:0}
+button{border:0;border-radius:10px;padding:12px 16px;font-size:15px;font-weight:600;cursor:pointer;background:var(--navy);color:#fff}
+button.full{width:100%}button.gold{background:var(--gold);color:var(--navy)}
+button.ghost{background:none;border:1px solid var(--line);color:var(--soft)}button.bad{background:var(--rust)}
+button:disabled{opacity:.5}
+.tabs{display:flex;gap:8px;margin-bottom:14px}.tabs button{flex:1;background:#fff;color:var(--navy);border:1px solid var(--line)}
+.tabs button.on{background:var(--navy);color:#fff}
+.msg{color:var(--rust);font-size:14px;min-height:20px;margin:6px 0}.ok{color:var(--sage)}
+.pill{display:inline-block;font-size:12px;font-weight:700;padding:3px 10px;border-radius:99px;background:#EFEADB;color:var(--navy)}
+.pill.g{background:#E4EEE4;color:var(--sage)}.pill.r{background:#F3E2DA;color:var(--rust)}
+.sp{display:flex;gap:8px;margin-top:10px}.sp button{flex:1}
+small{color:var(--soft)}a{color:var(--navy);font-weight:600}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+/* ---------- SETTINGS (edit these) ---------- */
+const CONFIG = {
+  url: "https://xgjhrhhurevvgzbaelcg.supabase.co",
+  key: "sb_publishable_oLh6DpQTqLJp1sq472ccnQ_XCIz_kiK",   // public key: safe in a web page
+  pricePerCourse: 4000,
+  account: { bank: "Kuda", number: "2083125342", name: "Onikepe Faruk Olamilekan" },
+  whatsapp: "2348161542738"
+};
+const COURSES = {
+  "100L": [["MTH 101","Elementary Mathematics I"],["GST 101","Use of English & Comm. Skills"],["CHM 101","General Chemistry I"],["PHY 101","General Physics I"]],
+  "200L": [["ECO 201","Intermediate Microeconomics"],["ACC 201","Financial Accounting I"],["STA 201","Statistics for Social Sciences"],["GST 201","Philosophy & Logic"]]
+};
+
+const db = supabase.createClient(CONFIG.url, CONFIG.key);
+let recovering = location.hash.includes("type=recovery");
+const app = document.getElementById("app");
+const payCode = () => "NET-" + (1000 + Math.floor(Math.random() * 9000));
+const naira = n => "₦" + n.toLocaleString("en-NG");
+const h = (tag, attrs = {}, ...kids) => {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else if (k === "class") e.className = v;
+    else if (v !== false && v != null) e.setAttribute(k, v === true ? "" : v);
+  }
+  kids.flat().forEach(c => e.append(c instanceof Node ? c : document.createTextNode(c ?? "")));
+  return e;
+};
+const shell = (...content) => h("div", {},
+  h("div", { class: "top" }, h("b", {}, "New Era ", h("span", {}, "Tutors"))),
+  h("main", {}, ...content));
+const show = (...n) => app.replaceChildren(...n);
+const logoutBtn = () => h("button", { class: "ghost full", onclick: async () => { await db.auth.signOut(); route(); } }, "Log out");
+const waLink = text => h("a", { href: "https://wa.me/" + CONFIG.whatsapp, target: "_blank", rel: "noreferrer" }, text);
+
+/* ---------- LOGIN / SIGN UP ---------- */
+function authView(mode = "login") {
+  const msg = h("p", { class: "msg" });
+  const say = (t, good) => { msg.textContent = t; msg.className = "msg" + (good ? " ok" : ""); };
+  const email = h("input", { type: "email", autocomplete: "email", placeholder: "you@example.com" });
+  const pw = h("input", { type: "password", autocomplete: mode === "login" ? "current-password" : "new-password", placeholder: "At least 6 characters" });
+  const tabs = h("div", { class: "tabs" },
+    h("button", { class: mode === "login" ? "on" : "", onclick: () => authView("login") }, "Log in"),
+    h("button", { class: mode === "signup" ? "on" : "", onclick: () => authView("signup") }, "Register"));
+
+  if (mode === "login") {
+    const btn = h("button", { class: "full" }, "Log in");
+    btn.onclick = async () => {
+      say(""); btn.disabled = true;
+      const { error } = await db.auth.signInWithPassword({ email: email.value.trim(), password: pw.value });
+      btn.disabled = false;
+      if (error) return say("Wrong email or password.");
+      route();
+    };
+    return show(shell(tabs, h("div", { class: "card" }, h("h2", {}, "Enter your portal"),
+      h("label", {}, "Email", email), h("label", {}, "Password", pw), msg, btn),
+      h("button", { class: "ghost full", onclick: () => resetView() }, "Forgot password?")));
+  }
+
+  const name = h("input", { type: "text", autocomplete: "name", placeholder: "e.g. Ada Lovelace" });
+  const age = h("input", { type: "number", placeholder: "e.g. 17" });
+  const total = h("b", {}, naira(0));
+  const picked = new Set();
+  const courseBox = h("div");
+  const level = h("select", {}, h("option", { value: "100L" }, "100L — First year"), h("option", { value: "200L" }, "200L — Second year"));
+  const draw = () => {
+    picked.clear(); total.textContent = naira(0);
+    courseBox.replaceChildren(...COURSES[level.value].map(([code, title]) => {
+      const cb = h("input", { type: "checkbox" });
+      cb.addEventListener("change", () => {
+        cb.checked ? picked.add(code) : picked.delete(code);
+        total.textContent = naira(picked.size * CONFIG.pricePerCourse);
+      });
+      return h("label", { class: "row" }, cb, code + " — " + title);
+    }));
+  };
+  level.addEventListener("change", draw); draw();
+
+  const btn = h("button", { class: "full gold" }, "Register & request approval");
+  btn.onclick = async () => {
+    say("");
+    if (!name.value.trim()) return say("Enter your full name.");
+    if (!/^\S+@\S+\.\S+$/.test(email.value.trim())) return say("Enter a valid email.");
+    if (pw.value.length < 6) return say("Password must be at least 6 characters.");
+    if (!age.value || age.value < 12 || age.value > 70) return say("Enter a valid age.");
+    if (!picked.size) return say("Pick at least one course.");
+    btn.disabled = true;
+    const { data, error } = await db.auth.signUp({
+      email: email.value.trim(), password: pw.value,
+      options: { data: { full_name: name.value.trim(), level: level.value, age: age.value } }
+    });
+    if (error) { btn.disabled = false; return say(error.message); }
+    let session = data.session;
+    if (!session) {   // some projects still report "no session"; try signing in straight away
+      const r = await db.auth.signInWithPassword({ email: email.value.trim(), password: pw.value });
+      session = r.data?.session;
+    }
+    if (!session) { btn.disabled = false; return say("Account created. Confirm the email we sent you, then log in.", true); }
+    const courses = [...picked];
+    const { error: e2 } = await db.from("payments").insert({
+      student_id: data.user.id, course_codes: courses,
+      amount: courses.length * CONFIG.pricePerCourse, reference: payCode(), status: "unpaid"
+    });
+    if (e2) { btn.disabled = false; return say("Account created, but the payment request failed. Log in and tell a tutor."); }
+    route();
+  };
+  show(shell(tabs, h("div", { class: "card" }, h("h2", {}, "Create your account"),
+    h("label", {}, "Full name", name), h("label", {}, "Email", email), h("label", {}, "Password", pw),
+    h("label", {}, "Age", age), h("label", {}, "Level", level),
+    h("h3", {}, "Your courses"), courseBox,
+    h("p", {}, "Total: ", total, "  ", h("small", {}, "(" + naira(CONFIG.pricePerCourse) + " per course)")),
+    h("p", {}, h("small", {}, "After you register, you’ll see where to pay and your personal payment code.")), msg, btn)));
+}
+
+/* ---------- PASSWORD RESET ---------- */
+const mkMsg = () => {
+  const msg = h("p", { class: "msg" });
+  return [msg, (t, good) => { msg.textContent = t; msg.className = "msg" + (good ? " ok" : ""); }];
+};
+function resetView() {
+  const [msg, say] = mkMsg();
+  const email = h("input", { type: "email", autocomplete: "email", placeholder: "you@example.com" });
+  const btn = h("button", { class: "full" }, "Send reset link");
+  btn.onclick = async () => {
+    say("");
+    if (!/^\S+@\S+\.\S+$/.test(email.value.trim())) return say("Enter the email you registered with.");
+    btn.disabled = true;
+    const { error } = await db.auth.resetPasswordForEmail(email.value.trim(), { redirectTo: location.origin + location.pathname });
+    btn.disabled = false;
+    if (error) return say(error.message);
+    say("If that email is registered, a reset link is on its way. Check your inbox and spam folder.", true);
+  };
+  show(shell(h("div", { class: "card" }, h("h2", {}, "Reset your password"), h("label", {}, "Email", email), msg, btn),
+    h("button", { class: "ghost full", onclick: () => authView("login") }, "Back to log in")));
+}
+function newPasswordView() {
+  const [msg, say] = mkMsg();
+  const pw = h("input", { type: "password", autocomplete: "new-password", placeholder: "At least 6 characters" });
+  const btn = h("button", { class: "full gold" }, "Save new password");
+  btn.onclick = async () => {
+    say("");
+    if (pw.value.length < 6) return say("Password must be at least 6 characters.");
+    btn.disabled = true;
+    const { error } = await db.auth.updateUser({ password: pw.value });
+    if (error) { btn.disabled = false; return say(error.message); }
+    recovering = false;
+    history.replaceState(null, "", location.pathname);
+    route();
+  };
+  show(shell(h("div", { class: "card" }, h("h2", {}, "Choose a new password"), h("label", {}, "New password", pw), msg, btn)));
+}
+
+/* ---------- STUDENT ---------- */
+async function studentView(me) {
+  const payBox = p => {
+    const wa = "https://wa.me/" + CONFIG.whatsapp + "?text=" + encodeURIComponent("Hello, I have paid " + naira(p.amount) + " for " + p.course_codes.join(", ") + ". Name: " + me.full_name + ". Payment code: " + (p.reference || "") + ". My receipt is attached.");
+    const details = [
+      h("p", {}, "Send ", h("b", {}, naira(p.amount)), " to:"),
+      h("p", {}, h("b", {}, CONFIG.account.bank + " · " + CONFIG.account.number), h("br"), CONFIG.account.name),
+      h("p", {}, "Your payment code: ", h("b", {}, p.reference || ""))
+    ];
+    const rules = h("p", {}, h("b", {}, "You must"), " write this code in the transfer description, and send your receipt (screenshot) on WhatsApp to ", h("b", {}, "0816 154 2738"), ". Payments without the code and the receipt will not be approved.");
+    if (p.status === "unpaid") {
+      const btn = h("button", { class: "full gold" }, "I’ve made the transfer");
+      btn.onclick = async () => {
+        btn.disabled = true;
+        const { data, error } = await db.from("payments").update({ status: "pending" }).eq("id", p.id).select();
+        if (error || !data?.length) { btn.disabled = false; return alert("Could not update. Please try again."); }
+        studentView(me);
+      };
+      return h("div", { class: "card", style: "border-color:#C6A24C" }, h("h3", {}, "Step 1: make your payment"), ...details, rules, btn);
+    }
+    return h("div", { class: "card", style: "border-color:#C6A24C" }, h("h3", {}, "Step 2: send your receipt"),
+      h("p", {}, "Your payment is waiting for a tutor to confirm it. Send your receipt on WhatsApp now so it can be approved faster."),
+      ...details, h("a", { href: wa, target: "_blank", rel: "noreferrer" }, "Send receipt on WhatsApp"));
+  };
+  const [en, pay] = await Promise.all([
+    db.from("enrollments").select("course_code").eq("student_id", me.id).eq("status", "active"),
+    db.from("payments").select("*").eq("student_id", me.id).order("created_at", { ascending: false })
+  ]);
+  const active = (en.data || []).map(x => x.course_code);
+  const pills = { unpaid: ["Awaiting your payment", ""], pending: ["Waiting for approval", ""], approved: ["Approved", "g"], rejected: ["Rejected", "r"] };
+  show(shell(
+    h("div", { class: "card" }, h("h2", {}, "Welcome, " + me.full_name.split(" ")[0]),
+      h("p", {}, "Student ID: ", h("b", {}, me.matric || "given after your payment is approved"), h("br"), me.level)),
+    ...(pay.data || []).filter(p => p.status === "unpaid" || p.status === "pending").map(payBox),
+    h("div", { class: "card" }, h("h3", {}, "Your courses"),
+      active.length ? active.map(c => h("p", {}, "✓ " + c))
+        : h("p", {}, "No active courses yet. Your portal opens as soon as a tutor confirms your payment."),
+      active.length ? h("small", {}, "Tests, scores, materials and messages are coming in the next update.") : ""),
+    h("div", { class: "card" }, h("h3", {}, "Payments"),
+      (pay.data || []).length ? pay.data.map(p => h("p", {},
+        h("span", { class: "pill " + pills[p.status][1] }, pills[p.status][0]), "  " + p.course_codes.join(", ") + " · " + naira(p.amount)))
+        : h("p", {}, "No payments yet."),
+      (pay.data || []).some(p => p.status === "rejected") ? h("p", {}, "A payment was rejected. Please ", waLink("message us on WhatsApp"), ".") : ""),
+    logoutBtn()));
+}
+
+/* ---------- ADMIN / TUTOR ---------- */
+async function adminView(me) {
+  const [pend, studs] = await Promise.all([
+    db.from("payments").select("*, profiles!payments_student_id_fkey(full_name,matric,level)").eq("status", "pending").order("created_at"),
+    db.from("profiles").select("full_name,matric,level").eq("role", "student").order("created_at", { ascending: false })
+  ]);
+  const act = (fn, label) => async ev => {
+    const b = ev.target; b.disabled = true;
+    const { error } = await fn();
+    if (error) { b.disabled = false; return alert("Failed: " + error.message); }
+    adminView(me);
+  };
+  const rows = (pend.data || []).map(p => h("div", { class: "card" },
+    h("h3", {}, p.profiles?.full_name + " · " + p.profiles?.level),
+    h("p", {}, p.profiles?.matric || "New student (ID given on approval)", h("br"), p.course_codes.join(", ") + " — " + naira(p.amount),
+      p.reference ? h("br") : "", p.reference ? h("b", {}, "Payment code: " + p.reference) : ""),
+    h("div", { class: "sp" },
+      h("button", { class: "gold", onclick: act(() => db.rpc("approve_payment", { pid: p.id })) }, "Approve"),
+      h("button", { class: "bad", onclick: act(() => db.from("payments").update({ status: "rejected", reviewed_by: me.id, reviewed_at: new Date().toISOString() }).eq("id", p.id)) }, "Reject"))));
+  show(shell(
+    h("div", { class: "card" }, h("h2", {}, "Admin · " + me.full_name),
+      h("p", {}, h("span", { class: "pill" }, me.role === "owner" ? "Owner" : "Tutor"), "  " + (studs.data || []).length + " students registered")),
+    h("h3", {}, "Payments waiting for approval (" + rows.length + ")"),
+    rows.length ? rows : h("div", { class: "card" }, h("p", {}, "Nothing waiting.")),
+    h("div", { class: "card" }, h("h3", {}, "All students"),
+      (studs.data || []).length ? studs.data.map(s => h("p", {}, s.full_name + " · " + s.level + " · ", h("small", {}, s.matric || "no ID yet"))) : h("p", {}, "None yet.")),
+    h("button", { class: "ghost full", onclick: () => adminView(me) }, "Refresh"),
+    h("div", { style: "height:10px" }), logoutBtn()));
+}
+
+/* ---------- ROUTER ---------- */
+async function route() {
+  if (recovering) return newPasswordView();
+  const { data: { session } } = await db.auth.getSession();
+  if (!session) return authView("login");
+  const { data: me, error } = await db.from("profiles").select("*").eq("id", session.user.id).single();
+  if (error || !me) { await db.auth.signOut(); return authView("login"); }
+  me.role === "student" ? studentView(me) : adminView(me);
+}
+db.auth.onAuthStateChange(ev => { if (ev === "PASSWORD_RECOVERY") { recovering = true; newPasswordView(); } });
+route();
+</script>
+</body>
+</html>
